@@ -1,9 +1,9 @@
 --[[
-    ERDN PREMIUM SCRIPT | Muscle Legends — Sakura Premium UI 🌸
+    ERDN PREMIUM SCRIPT | Muscle Legends — Halloween Spooky UI 🎃🦇
     ------------------------------------------------------------
     🔑 KEY: ERDNONTOP
-    Added: More petals, sparkle effects, pulsing border.
-    Fast Rep, Auto Rebirth (6s) and Auto Kill Boss logic INTACT.
+    Features: Fast Rep, Auto Rebirth (6s), Auto Kill Boss, 
+    Teleports, Anti-AFK, FPS Boost, and Halloween Theme UI.
 ]]
 
 --==================== SERVICES ====================
@@ -13,6 +13,7 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local RS = ReplicatedStorage
 local KEY = "ERDNONTOP"
@@ -26,19 +27,22 @@ local State = {
     KillAura = false,
     WalkSpeed = 16,
     JumpPower = 50,
+    AntiAFK = false,
+    FPSBoost = false,
 }
 
---==================== PREMIUM PALETTE ====================
+--==================== HALLOWEEN PALETTE ====================
 local Colors = {
-    bg = Color3.fromRGB(255, 240, 245),
-    sidebar = Color3.fromRGB(255, 228, 235),
-    panel = Color3.fromRGB(255, 250, 252),
-    accent = Color3.fromRGB(255, 120, 170),
-    accentDark = Color3.fromRGB(220, 70, 130),
-    text = Color3.fromRGB(110, 50, 90),
-    textDim = Color3.fromRGB(170, 120, 150),
-    border = Color3.fromRGB(255, 200, 215),
-    danger = Color3.fromRGB(255, 90, 120),
+    bg = Color3.fromRGB(15, 8, 20),        -- Dark Night
+    sidebar = Color3.fromRGB(25, 12, 30),   -- Deep Purple
+    panel = Color3.fromRGB(35, 18, 40),     -- Dark Panel
+    accent = Color3.fromRGB(255, 100, 0),   -- Pumpkin Orange
+    accentDark = Color3.fromRGB(200, 50, 0),-- Dark Orange
+    purple = Color3.fromRGB(150, 50, 200),  -- Neon Purple
+    text = Color3.fromRGB(230, 230, 240),   -- Ghost White
+    textDim = Color3.fromRGB(150, 130, 160),
+    border = Color3.fromRGB(150, 50, 200),  -- Purple Border
+    danger = Color3.fromRGB(200, 0, 0),     -- Blood Red
     white = Color3.fromRGB(255, 255, 255),
 }
 
@@ -47,13 +51,13 @@ local function getChar() return player.Character end
 local function getHRP() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
 local function getHum() local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
 
--- Efecto de Destello al hacer clic
+-- Sparkle Effect on Click (Orange/Purple)
 local function createSparkle(parent, x, y)
     for i = 1, 6 do
         local s = Instance.new("Frame")
         s.Size = UDim2.new(0, math.random(4, 8), 0, math.random(4, 8))
         s.Position = UDim2.new(0, x - parent.AbsolutePosition.X, 0, y - parent.AbsolutePosition.Y)
-        s.BackgroundColor3 = Colors.accent
+        s.BackgroundColor3 = (i % 2 == 0) and Colors.accent or Colors.purple
         s.BorderSizePixel = 0
         s.ZIndex = (parent.ZIndex or 1) + 1
         s.Parent = parent
@@ -69,19 +73,19 @@ local function createSparkle(parent, x, y)
     end
 end
 
--- Efecto de Pétalos Masivos
-local function spawnPetals(parent, amount, speedRange)
+-- Halloween Particles (Pumpkins and Bats)
+local function spawnSpookyParticles(parent, amount, speedRange)
     task.spawn(function()
         while parent and parent.Parent do
             for i = 1, amount do
                 local p = Instance.new("TextLabel")
-                p.Size = UDim2.new(0, math.random(15, 35), 0, math.random(15, 35))
+                p.Size = UDim2.new(0, math.random(20, 40), 0, math.random(20, 40))
                 p.Position = UDim2.new(math.random(), 0, -0.1, 0)
                 p.BackgroundTransparency = 1
-                p.Text = "🌸"
-                p.TextSize = math.random(15, 35)
-                p.TextTransparency = 0.2 + (math.random() * 0.6)
-                p.Rotation = math.random(-45, 45)
+                p.Text = (math.random(1, 2) == 1) and "🎃" or "🦇"
+                p.TextSize = math.random(20, 40)
+                p.TextTransparency = 0.2 + (math.random() * 0.5)
+                p.Rotation = math.random(-30, 30)
                 p.ZIndex = 0
                 p.Parent = parent
                 
@@ -324,9 +328,46 @@ player.CharacterAdded:Connect(function()
     applyStats()
 end)
 
---==================== UI PREMIUM ====================
+--==================== ANTI-AFK & FPS BOOST ====================
+local antiAfkConnection = nil
+local function toggleAntiAfk(state)
+    if state then
+        if antiAfkConnection then return end
+        antiAfkConnection = player.Idled:Connect(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+        end)
+    else
+        if antiAfkConnection then
+            antiAfkConnection:Disconnect()
+            antiAfkConnection = nil
+        end
+    end
+end
+
+local function toggleFPSBoost(state)
+    pcall(function()
+        if state then
+            for _, v in ipairs(game.Lighting:GetChildren()) do
+                if v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") then
+                    v.Enabled = false
+                end
+            end
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        else
+            for _, v in ipairs(game.Lighting:GetChildren()) do
+                if v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") then
+                    v.Enabled = true
+                end
+            end
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
+        end
+    end)
+end
+
+--==================== UI HALLOWEEN ====================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ERDN_Premium_UI"
+screenGui.Name = "ERDN_Halloween_UI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
@@ -335,11 +376,11 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- 1. KEY SYSTEM UI
 local keyFrame = Instance.new("Frame")
 keyFrame.Size = UDim2.new(1, 0, 1, 0)
-keyFrame.BackgroundColor3 = Color3.fromRGB(255, 235, 245)
+keyFrame.BackgroundColor3 = Colors.bg
 keyFrame.BorderSizePixel = 0
 keyFrame.ZIndex = 100
 keyFrame.Parent = screenGui
-spawnPetals(keyFrame, 25, {4, 8}) -- Pétalos masivos al inicio
+spawnSpookyParticles(keyFrame, 20, {4, 8})
 
 local keyCard = Instance.new("Frame")
 keyCard.Size = UDim2.new(0, 340, 0, 240)
@@ -351,17 +392,17 @@ keyCard.Parent = keyFrame
 Instance.new("UICorner", keyCard).CornerRadius = UDim.new(0, 20)
 
 local keyStroke = Instance.new("UIStroke", keyCard)
-keyStroke.Color = Colors.accent
+keyStroke.Color = Colors.purple
 keyStroke.Thickness = 2
-keyStroke.Transparency = 0.5
+keyStroke.Transparency = 0.2
 
 local keyTitle = Instance.new("TextLabel")
 keyTitle.Size = UDim2.new(1, 0, 0, 40)
 keyTitle.Position = UDim2.new(0, 0, 0, 25)
 keyTitle.BackgroundTransparency = 1
 keyTitle.RichText = true
-keyTitle.Text = "🌸 <font color='#ff78aa'>ERDN</font> <font color='#d84682'>PREMIUM</font>"
-keyTitle.TextColor3 = Colors.accentDark
+keyTitle.Text = "🎃 <font color='#ff6400'>ERDN</font> <font color='#9b30ff'>PREMIUM</font> 🎃"
+keyTitle.TextColor3 = Colors.white
 keyTitle.TextSize = 24
 keyTitle.Font = Enum.Font.GothamBold
 keyTitle.ZIndex = 102
@@ -371,7 +412,7 @@ local keyInput = Instance.new("TextBox")
 keyInput.Size = UDim2.new(1, -60, 0, 45)
 keyInput.Position = UDim2.new(0, 30, 0, 85)
 keyInput.BackgroundColor3 = Colors.bg
-keyInput.PlaceholderText = "Enter access key..."
+keyInput.PlaceholderText = "Enter spooky key..."
 keyInput.PlaceholderColor3 = Colors.textDim
 keyInput.Text = ""
 keyInput.TextColor3 = Colors.text
@@ -380,13 +421,14 @@ keyInput.Font = Enum.Font.GothamMedium
 keyInput.ZIndex = 102
 keyInput.Parent = keyCard
 Instance.new("UICorner", keyInput).CornerRadius = UDim.new(0, 10)
+local inputStroke = Instance.new("UIStroke", keyInput); inputStroke.Color = Colors.purple; inputStroke.Thickness = 1; inputStroke.Transparency = 0.5
 
 local verifyBtn = Instance.new("TextButton")
 verifyBtn.Size = UDim2.new(1, -60, 0, 45)
 verifyBtn.Position = UDim2.new(0, 30, 0, 150)
 verifyBtn.BackgroundColor3 = Colors.accent
-verifyBtn.Text = "VERIFY ✿"
-verifyBtn.TextColor3 = Colors.white
+verifyBtn.Text = "VERIFY 🦇"
+verifyBtn.TextColor3 = Colors.bg
 verifyBtn.TextSize = 15
 verifyBtn.Font = Enum.Font.GothamBold
 verifyBtn.ZIndex = 102
@@ -399,17 +441,17 @@ local function playSplashAnimation(onComplete)
     
     local splash = Instance.new("Frame")
     splash.Size = UDim2.new(1, 0, 1, 0)
-    splash.BackgroundColor3 = Color3.fromRGB(255, 240, 245)
+    splash.BackgroundColor3 = Colors.bg
     splash.BorderSizePixel = 0
     splash.ZIndex = 200
     splash.Parent = screenGui
-    spawnPetals(splash, 40, {2, 6}) -- Muchos pétalos en el splash
+    spawnSpookyParticles(splash, 40, {2, 6})
     
     local splashGrad = Instance.new("UIGradient")
     splashGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 235)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 200, 225)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 200, 255))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 10, 40)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 5, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 10, 30))
     })
     splashGrad.Rotation = 135
     splashGrad.Parent = splash
@@ -419,7 +461,7 @@ local function playSplashAnimation(onComplete)
     logo.Position = UDim2.new(0, 0, 0.4, -60)
     logo.BackgroundTransparency = 1
     logo.RichText = true
-    logo.Text = "<font color='#d8509a'>ERDN</font> <font color='#9b7ad6'>PREMIUM</font>"
+    logo.Text = "<font color='#ff6400'>ERDN</font> <font color='#9b30ff'>PREMIUM</font>"
     logo.TextSize = 50
     logo.Font = Enum.Font.GothamBold
     logo.TextTransparency = 1
@@ -430,7 +472,7 @@ local function playSplashAnimation(onComplete)
     icon.Size = UDim2.new(1, 0, 0, 80)
     icon.Position = UDim2.new(0, 0, 0.4, -140)
     icon.BackgroundTransparency = 1
-    icon.Text = "🌸"
+    icon.Text = "🎃"
     icon.TextSize = 70
     icon.TextTransparency = 1
     icon.ZIndex = 201
@@ -439,8 +481,7 @@ local function playSplashAnimation(onComplete)
     local barBg = Instance.new("Frame")
     barBg.Size = UDim2.new(0, 300, 0, 8)
     barBg.Position = UDim2.new(0.5, -150, 0.5, 50)
-    barBg.BackgroundColor3 = Colors.white
-    barBg.BackgroundTransparency = 0.5
+    barBg.BackgroundColor3 = Colors.panel
     barBg.BorderSizePixel = 0
     barBg.ZIndex = 201
     barBg.Parent = splash
@@ -453,6 +494,7 @@ local function playSplashAnimation(onComplete)
     barFill.ZIndex = 202
     barFill.Parent = barBg
     Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+    local fillGrad = Instance.new("UIGradient"); fillGrad.Color = ColorSequence.new(Colors.accent, Colors.purple); fillGrad.Parent = barFill
 
     task.spawn(function()
         task.wait(0.2)
@@ -484,24 +526,22 @@ local function buildMainUI()
     main.Draggable = true
     main.Parent = screenGui
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 20)
-    spawnPetals(main, 15, {5, 10}) -- Pétalos en la UI principal
+    spawnSpookyParticles(main, 15, {5, 10})
     
     local mainStroke = Instance.new("UIStroke", main)
     mainStroke.Color = Colors.border
     mainStroke.Thickness = 2
     mainStroke.Transparency = 0.2
 
-    -- Animación de brillo pulsante en el borde
     task.spawn(function()
         while main and main.Parent do
             TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {Color = Colors.accent, Transparency = 0.8}):Play()
             task.wait(2)
-            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {Color = Colors.border, Transparency = 0.2}):Play()
+            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {Color = Colors.purple, Transparency = 0.2}):Play()
             task.wait(2)
         end
     end)
 
-    -- Window Entry Animation
     main.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(main, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 580, 0, 430)}):Play()
 
@@ -518,8 +558,8 @@ local function buildMainUI()
     title.Position = UDim2.new(0, 20, 0, 12)
     title.BackgroundTransparency = 1
     title.RichText = true
-    title.Text = "🌸 <font color='#ff78aa'>ERDN</font> <font color='#d84682'>PREMIUM SCRIPT</font>"
-    title.TextColor3 = Colors.accentDark
+    title.Text = "🎃 <font color='#ff6400'>ERDN</font> <font color='#9b30ff'>PREMIUM SCRIPT</font> 🦇"
+    title.TextColor3 = Colors.white
     title.TextSize = 16
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
@@ -531,7 +571,7 @@ local function buildMainUI()
     minimizeBtn.Position = UDim2.new(1, -40, 0, 12)
     minimizeBtn.BackgroundColor3 = Colors.accent
     minimizeBtn.Text = "−"
-    minimizeBtn.TextColor3 = Colors.white
+    minimizeBtn.TextColor3 = Colors.bg
     minimizeBtn.TextSize = 18
     minimizeBtn.Font = Enum.Font.GothamBold
     minimizeBtn.Parent = header
@@ -572,10 +612,10 @@ local function buildMainUI()
     end
 
     local tabs = {
-        {name = "Farm", icon = "🌸"},
-        {name = "Boss", icon = "👹"},
-        {name = "Teleport", icon = "🌷"},
-        {name = "Utils", icon = "🎀"},
+        {name = "Farm", icon = "🎃"},
+        {name = "Boss", icon = "👻"},
+        {name = "Teleport", icon = "🕸️"},
+        {name = "Utils", icon = "🦇"},
     }
 
     for _, tab in ipairs(tabs) do
@@ -613,17 +653,17 @@ local function buildMainUI()
             for _, b in ipairs(sidebar:GetChildren()) do
                 if b:IsA("TextButton") then
                     b.BackgroundColor3 = (b == btn) and Colors.accent or Colors.panel
-                    b.TextColor3 = (b == btn) and Colors.white or Colors.text
+                    b.TextColor3 = (b == btn) and Colors.bg or Colors.text
                 end
             end
         end)
     end
 
-    -- UI Helper Functions (Toggles & Buttons with Sparkles)
+    -- UI Helper Functions
     local function createToggle(parent, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -10, 0, 52)
-        frame.BackgroundColor3 = Colors.white
+        frame.BackgroundColor3 = Colors.sidebar
         frame.BorderSizePixel = 0
         frame.Parent = parent
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
@@ -647,7 +687,7 @@ local function buildMainUI()
         local toggle = Instance.new("TextButton")
         toggle.Size = UDim2.new(0, 44, 0, 24)
         toggle.Position = UDim2.new(1, -56, 0.5, -12)
-        toggle.BackgroundColor3 = Colors.border
+        toggle.BackgroundColor3 = Colors.bg
         toggle.Text = ""
         toggle.Parent = frame
         Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
@@ -655,7 +695,7 @@ local function buildMainUI()
         local knob = Instance.new("Frame")
         knob.Size = UDim2.new(0, 18, 0, 18)
         knob.Position = UDim2.new(0, 3, 0.5, -9)
-        knob.BackgroundColor3 = Colors.white
+        knob.BackgroundColor3 = Colors.textDim
         knob.Parent = toggle
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
@@ -663,8 +703,8 @@ local function buildMainUI()
         local toggleObj = {
             set = function(newState, invoke)
                 state = newState
-                TweenService:Create(toggle, TweenInfo.new(0.25), {BackgroundColor3 = state and Colors.accent or Colors.border}):Play()
-                TweenService:Create(knob, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)}):Play()
+                TweenService:Create(toggle, TweenInfo.new(0.25), {BackgroundColor3 = state and Colors.accent or Colors.bg}):Play()
+                TweenService:Create(knob, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9), BackgroundColor3 = state and Colors.white or Colors.textDim}):Play()
                 
                 if state then
                     stroke.Color = Colors.accent
@@ -681,7 +721,7 @@ local function buildMainUI()
         toggle.MouseButton1Click:Connect(function() 
             toggleObj.set(not state, true) 
             local mouse = UserInputService:GetMouseLocation()
-            createSparkle(frame, mouse.X, mouse.Y) -- Efecto de destello
+            createSparkle(frame, mouse.X, mouse.Y)
         end)
         return toggleObj
     end
@@ -689,7 +729,7 @@ local function buildMainUI()
     local function createButton(parent, text, callback)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -10, 0, 38)
-        btn.BackgroundColor3 = Colors.white
+        btn.BackgroundColor3 = Colors.sidebar
         btn.Text = text
         btn.TextColor3 = Colors.text
         btn.TextSize = 12
@@ -699,11 +739,11 @@ local function buildMainUI()
         local bs = Instance.new("UIStroke", btn); bs.Color = Colors.border; bs.Thickness = 1; bs.Transparency = 0.5
         
         btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.accent, TextColor3 = Colors.white}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.accent, TextColor3 = Colors.bg}):Play()
             bs.Color = Colors.accent
         end)
         btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.white, TextColor3 = Colors.text}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.sidebar, TextColor3 = Colors.text}):Play()
             bs.Color = Colors.border
         end)
         btn.MouseButton1Click:Connect(function()
@@ -771,6 +811,7 @@ local function buildMainUI()
     statusFrame.BorderSizePixel = 0
     statusFrame.Parent = bossPage
     Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0, 10)
+    local sfStroke = Instance.new("UIStroke", statusFrame); sfStroke.Color = Colors.border; sfStroke.Thickness = 1; sfStroke.Transparency = 0.5
     
     local statusTitle = Instance.new("TextLabel")
     statusTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -798,7 +839,7 @@ local function buildMainUI()
         if v then 
             startAutoBossKill() 
             statusTitle.Text = "Status: Searching..."
-            statusTitle.TextColor3 = Colors.accentDark
+            statusTitle.TextColor3 = Colors.accent
         else 
             State.AutoBossKill = false 
             statusTitle.Text = "Status: Inactive"
@@ -820,7 +861,7 @@ local function buildMainUI()
     -- Teleport Tab
     local tpPage = pages["Teleport"]
     for gymName, _ in pairs(gymCoords) do
-        createButton(tpPage, "🌷 " .. gymName, function() teleportToGym(gymName) end)
+        createButton(tpPage, "🕸️ " .. gymName, function() teleportToGym(gymName) end)
     end
 
     -- Utils Tab
@@ -835,6 +876,14 @@ local function buildMainUI()
             game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
             game.Lighting.Brightness = 1
         end
+    end)
+    
+    createToggle(utilPage, "Anti-AFK", function(v)
+        toggleAntiAfk(v)
+    end)
+    
+    createToggle(utilPage, "FPS Boost", function(v)
+        toggleFPSBoost(v)
     end)
 
     switchTab("Farm")
@@ -868,22 +917,21 @@ local function buildMainUI()
         floatBtn.Size = UDim2.new(0, 54, 0, 54)
         floatBtn.Position = UDim2.new(0, 20, 0.5, -27)
         floatBtn.BackgroundColor3 = Colors.accent
-        floatBtn.Text = "🌸"
+        floatBtn.Text = "🎃"
         floatBtn.TextSize = 24
         floatBtn.Font = Enum.Font.GothamBold
-        floatBtn.TextColor3 = Colors.white
+        floatBtn.TextColor3 = Colors.bg
         floatBtn.Parent = screenGui
         Instance.new("UICorner", floatBtn).CornerRadius = UDim.new(1, 0)
         
         local floatStroke = Instance.new("UIStroke", floatBtn)
-        floatStroke.Color = Colors.white
+        floatStroke.Color = Colors.purple
         floatStroke.Thickness = 2
         floatStroke.Transparency = 0.5
 
         floatBtn.Size = UDim2.new(0, 0, 0, 0)
         TweenService:Create(floatBtn, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 54, 0, 54)}):Play()
 
-        -- Pulso en el botón flotante
         task.spawn(function()
             while floatBtn and floatBtn.Parent do
                 TweenService:Create(floatStroke, TweenInfo.new(1, Enum.EasingStyle.Sine), {Transparency = 0}):Play()
@@ -916,7 +964,7 @@ verifyBtn.MouseButton1Click:Connect(function()
         playSplashAnimation(buildMainUI)
     else
         keyInput.Text = ""
-        keyInput.PlaceholderText = "Invalid Key"
+        keyInput.PlaceholderText = "Invalid Spooky Key"
         keyInput.PlaceholderColor3 = Colors.danger
     end
 end)
