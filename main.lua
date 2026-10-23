@@ -2,12 +2,8 @@
     ERDN PREMIUM SCRIPT | Muscle Legends — Sakura Premium UI 🌸
     ------------------------------------------------------------
     🔑 KEY: ERDNONTOP
-    Features:
-    - Fast Rep (4 Modes)
-    - Auto Rebirth (6s interval)
-    - Auto Kill Boss (+50K HP Recursive Detection)
-    - Auto Spin Wheel, Kill Aura, Teleports
-    - Beautiful UI with Splash Animation and Minimize System
+    Added: More petals, sparkle effects, pulsing border.
+    Fast Rep, Auto Rebirth (6s) and Auto Kill Boss logic INTACT.
 ]]
 
 --==================== SERVICES ====================
@@ -51,9 +47,60 @@ local function getChar() return player.Character end
 local function getHRP() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
 local function getHum() local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
 
---==================== FAST REP (INTACT) ====================
-local fastRepThread = nil
+-- Efecto de Destello al hacer clic
+local function createSparkle(parent, x, y)
+    for i = 1, 6 do
+        local s = Instance.new("Frame")
+        s.Size = UDim2.new(0, math.random(4, 8), 0, math.random(4, 8))
+        s.Position = UDim2.new(0, x - parent.AbsolutePosition.X, 0, y - parent.AbsolutePosition.Y)
+        s.BackgroundColor3 = Colors.accent
+        s.BorderSizePixel = 0
+        s.ZIndex = (parent.ZIndex or 1) + 1
+        s.Parent = parent
+        Instance.new("UICorner", s).CornerRadius = UDim.new(1, 0)
+        
+        TweenService:Create(s, TweenInfo.new(0.6, Enum.EasingStyle.Quart), {
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1,
+            Position = s.Position + UDim2.new(0, math.random(-30, 30), 0, math.random(-30, 30))
+        }):Play()
+        
+        task.delay(0.6, function() if s and s.Parent then s:Destroy() end end)
+    end
+end
 
+-- Efecto de Pétalos Masivos
+local function spawnPetals(parent, amount, speedRange)
+    task.spawn(function()
+        while parent and parent.Parent do
+            for i = 1, amount do
+                local p = Instance.new("TextLabel")
+                p.Size = UDim2.new(0, math.random(15, 35), 0, math.random(15, 35))
+                p.Position = UDim2.new(math.random(), 0, -0.1, 0)
+                p.BackgroundTransparency = 1
+                p.Text = "🌸"
+                p.TextSize = math.random(15, 35)
+                p.TextTransparency = 0.2 + (math.random() * 0.6)
+                p.Rotation = math.random(-45, 45)
+                p.ZIndex = 0
+                p.Parent = parent
+                
+                local dur = math.random(speedRange[1], speedRange[2])
+                TweenService:Create(p, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
+                    Position = UDim2.new(p.Position.X.Scale, math.random(-100, 100), 1.1, 0),
+                    Rotation = math.random(-360, 360),
+                    TextTransparency = 1,
+                }):Play()
+                
+                task.delay(dur + 0.5, function() if p and p.Parent then p:Destroy() end end)
+            end
+            task.wait(math.random(3, 6) / 10)
+        end
+    end)
+end
+
+--==================== FAST REP (LOGIC INTACT) ====================
+local fastRepThread = nil
 local function stopFastRep()
     State.FastRep = false
     if fastRepThread then
@@ -65,15 +112,12 @@ end
 local function startFastRep(burstSize)
     stopFastRep()
     State.FastRep = true
-
     fastRepThread = task.spawn(function()
         local cachedEvent = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
-        
         while State.FastRep do
             if not cachedEvent or not cachedEvent.Parent then
                 cachedEvent = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
             end
-            
             if cachedEvent then
                 for i = 1, burstSize do
                     if not State.FastRep then break end
@@ -113,8 +157,6 @@ local detectedBossCount = 0
 local function getBossTargets()
     local bosses = {}
     local myChar = getChar()
-    
-    -- 1. Search specific Boss folders
     local bossFolders = {"BossArena", "Bosses", "Boss"}
     for _, folderName in ipairs(bossFolders) do
         local folder = Workspace:FindFirstChild(folderName)
@@ -130,8 +172,6 @@ local function getBossTargets()
             if #bosses > 0 then return bosses end
         end
     end
-
-    -- 2. Recursive Workspace search
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Humanoid") then
             local model = obj.Parent
@@ -140,7 +180,6 @@ local function getBossTargets()
                     local name = string.lower(model.Name)
                     local isFriendly = string.find(name, "dummy") or string.find(name, "training") or string.find(name, "npc")
                     local isBoss = (obj.MaxHealth >= 50000) or string.find(name, "boss")
-                    
                     if not isFriendly and isBoss then
                         table.insert(bosses, {model = model, hum = obj})
                     end
@@ -158,7 +197,6 @@ local function startAutoBossKill()
         while State.AutoBossKill do
             local bosses = getBossTargets()
             detectedBossCount = #bosses
-            
             if #bosses == 0 then
                 currentBossName = "Searching..."
                 currentBossHealth = "N/A"
@@ -167,21 +205,17 @@ local function startAutoBossKill()
                 local b = bosses[1]
                 local hum = b.hum
                 local model = b.model
-                
                 if hum and hum.Health > 0 then
                     currentBossName = model.Name
                     currentBossHealth = math.floor(hum.Health) .. " / " .. math.floor(hum.MaxHealth)
-                    
                     local targetPart = model.PrimaryPart or model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
                     local hrp = getHRP()
                     local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
-                    
                     if targetPart and hrp and ev then
                         pcall(function()
                             hrp.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, 2, 0))
                             hrp.Velocity = Vector3.zero
                         end)
-                        
                         for _ = 1, 15 do
                             if not State.AutoBossKill then break end
                             pcall(function()
@@ -305,6 +339,7 @@ keyFrame.BackgroundColor3 = Color3.fromRGB(255, 235, 245)
 keyFrame.BorderSizePixel = 0
 keyFrame.ZIndex = 100
 keyFrame.Parent = screenGui
+spawnPetals(keyFrame, 25, {4, 8}) -- Pétalos masivos al inicio
 
 local keyCard = Instance.new("Frame")
 keyCard.Size = UDim2.new(0, 340, 0, 240)
@@ -368,6 +403,7 @@ local function playSplashAnimation(onComplete)
     splash.BorderSizePixel = 0
     splash.ZIndex = 200
     splash.Parent = screenGui
+    spawnPetals(splash, 40, {2, 6}) -- Muchos pétalos en el splash
     
     local splashGrad = Instance.new("UIGradient")
     splashGrad.Color = ColorSequence.new({
@@ -418,7 +454,6 @@ local function playSplashAnimation(onComplete)
     barFill.Parent = barBg
     Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
 
-    -- Animation Sequence
     task.spawn(function()
         task.wait(0.2)
         TweenService:Create(icon, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
@@ -449,11 +484,22 @@ local function buildMainUI()
     main.Draggable = true
     main.Parent = screenGui
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 20)
+    spawnPetals(main, 15, {5, 10}) -- Pétalos en la UI principal
     
     local mainStroke = Instance.new("UIStroke", main)
     mainStroke.Color = Colors.border
-    mainStroke.Thickness = 1.5
+    mainStroke.Thickness = 2
     mainStroke.Transparency = 0.2
+
+    -- Animación de brillo pulsante en el borde
+    task.spawn(function()
+        while main and main.Parent do
+            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {Color = Colors.accent, Transparency = 0.8}):Play()
+            task.wait(2)
+            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {Color = Colors.border, Transparency = 0.2}):Play()
+            task.wait(2)
+        end
+    end)
 
     -- Window Entry Animation
     main.Size = UDim2.new(0, 0, 0, 0)
@@ -573,7 +619,7 @@ local function buildMainUI()
         end)
     end
 
-    -- UI Helper Functions
+    -- UI Helper Functions (Toggles & Buttons with Sparkles)
     local function createToggle(parent, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -10, 0, 52)
@@ -581,6 +627,11 @@ local function buildMainUI()
         frame.BorderSizePixel = 0
         frame.Parent = parent
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+        
+        local stroke = Instance.new("UIStroke", frame)
+        stroke.Color = Colors.border
+        stroke.Thickness = 1
+        stroke.Transparency = 0.5
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, -60, 1, 0)
@@ -614,11 +665,24 @@ local function buildMainUI()
                 state = newState
                 TweenService:Create(toggle, TweenInfo.new(0.25), {BackgroundColor3 = state and Colors.accent or Colors.border}):Play()
                 TweenService:Create(knob, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)}):Play()
+                
+                if state then
+                    stroke.Color = Colors.accent
+                    stroke.Transparency = 0.2
+                else
+                    stroke.Color = Colors.border
+                    stroke.Transparency = 0.5
+                end
+                
                 if invoke and callback then callback(state) end
             end
         }
 
-        toggle.MouseButton1Click:Connect(function() toggleObj.set(not state, true) end)
+        toggle.MouseButton1Click:Connect(function() 
+            toggleObj.set(not state, true) 
+            local mouse = UserInputService:GetMouseLocation()
+            createSparkle(frame, mouse.X, mouse.Y) -- Efecto de destello
+        end)
         return toggleObj
     end
 
@@ -632,21 +696,28 @@ local function buildMainUI()
         btn.Font = Enum.Font.GothamBold
         btn.Parent = parent
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+        local bs = Instance.new("UIStroke", btn); bs.Color = Colors.border; bs.Thickness = 1; bs.Transparency = 0.5
         
         btn.MouseEnter:Connect(function()
             TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.accent, TextColor3 = Colors.white}):Play()
+            bs.Color = Colors.accent
         end)
         btn.MouseLeave:Connect(function()
             TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.white, TextColor3 = Colors.text}):Play()
+            bs.Color = Colors.border
         end)
-        btn.MouseButton1Click:Connect(callback)
+        btn.MouseButton1Click:Connect(function()
+            local mouse = UserInputService:GetMouseLocation()
+            createSparkle(btn, mouse.X, mouse.Y)
+            callback()
+        end)
     end
 
     -- Farm Tab
     local farmPage = pages["Farm"]
     local rep10k, rep2k, rep500, repExact500
 
-    rep10k = createToggle(farmPage, "Fast Rep ULTRA (30,000+ reps/sec)", function(v)
+    rep10k = createToggle(farmPage, "Ultra fast rep", function(v)
         if v then
             if rep2k then rep2k.set(false, false) end
             if rep500 then rep500.set(false, false) end
@@ -655,7 +726,7 @@ local function buildMainUI()
         else stopFastRep() end
     end)
 
-    rep2k = createToggle(farmPage, "Fast Rep Fast (9,000+ reps/sec)", function(v)
+    rep2k = createToggle(farmPage, "Max Ultra rep", function(v)
         if v then
             if rep10k then rep10k.set(false, false) end
             if rep500 then rep500.set(false, false) end
@@ -664,7 +735,7 @@ local function buildMainUI()
         else stopFastRep() end
     end)
 
-    rep500 = createToggle(farmPage, "Fast Rep Normal (1,800 reps/sec)", function(v)
+    rep500 = createToggle(farmPage, "Mega Fast Rep", function(v)
         if v then
             if rep10k then rep10k.set(false, false) end
             if rep2k then rep2k.set(false, false) end
@@ -673,7 +744,7 @@ local function buildMainUI()
         else stopFastRep() end
     end)
 
-    repExact500 = createToggle(farmPage, "Fast Rep Exact (500 reps/sec)", function(v)
+    repExact500 = createToggle(farmPage, "Fast rep", function(v)
         if v then
             if rep10k then rep10k.set(false, false) end
             if rep2k then rep2k.set(false, false) end
@@ -723,10 +794,10 @@ local function buildMainUI()
     statusBoss.TextXAlignment = Enum.TextXAlignment.Left
     statusBoss.Parent = statusFrame
 
-    createToggle(bossPage, "Auto Kill Boss (+50K HP)", function(v)
+    createToggle(bossPage, "Auto Kill Boss", function(v)
         if v then 
             startAutoBossKill() 
-            statusTitle.Text = "Status: Searching (+50K HP)..."
+            statusTitle.Text = "Status: Searching..."
             statusTitle.TextColor3 = Colors.accentDark
         else 
             State.AutoBossKill = false 
@@ -736,7 +807,7 @@ local function buildMainUI()
         end
     end)
     
-    createButton(bossPage, "🔍 Scan Bosses (F9)", function()
+    createButton(bossPage, "Scan Boss", function()
         local bosses = getBossTargets()
         if #bosses == 0 then print("No bosses found.") 
         else
@@ -803,9 +874,24 @@ local function buildMainUI()
         floatBtn.TextColor3 = Colors.white
         floatBtn.Parent = screenGui
         Instance.new("UICorner", floatBtn).CornerRadius = UDim.new(1, 0)
+        
+        local floatStroke = Instance.new("UIStroke", floatBtn)
+        floatStroke.Color = Colors.white
+        floatStroke.Thickness = 2
+        floatStroke.Transparency = 0.5
 
         floatBtn.Size = UDim2.new(0, 0, 0, 0)
         TweenService:Create(floatBtn, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 54, 0, 54)}):Play()
+
+        -- Pulso en el botón flotante
+        task.spawn(function()
+            while floatBtn and floatBtn.Parent do
+                TweenService:Create(floatStroke, TweenInfo.new(1, Enum.EasingStyle.Sine), {Transparency = 0}):Play()
+                task.wait(1)
+                TweenService:Create(floatStroke, TweenInfo.new(1, Enum.EasingStyle.Sine), {Transparency = 0.5}):Play()
+                task.wait(1)
+            end
+        end)
 
         floatBtn.MouseButton1Click:Connect(function()
             if not minimized then return end
@@ -827,7 +913,6 @@ end
 --==================== KEY SYSTEM LOGIC ====================
 verifyBtn.MouseButton1Click:Connect(function()
     if keyInput.Text == KEY then
-        -- Correct key -> Play splash animation -> Build Main UI
         playSplashAnimation(buildMainUI)
     else
         keyInput.Text = ""
