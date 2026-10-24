@@ -3,6 +3,7 @@
     ------------------------------------------------------------
     🔑 KEY: ERDNONTOP
     Auto Farm Boss: Exact Top Edge calculation (2.5 studs above, looking down).
+    Auto Punch: Direct network punch (No auto-clicker).
 ]]
 
 --==================== SERVICES ====================
@@ -154,21 +155,28 @@ local function startAutoRebirth()
     end)
 end
 
---==================== AUTO PUNCH ====================
+--==================== AUTO PUNCH (DIRECT NETWORK - NO AUTO CLICK) ====================
 local autoPunchConn = nil
 local function startAutoPunch()
     if State.AutoPunch then return end
     State.AutoPunch = true
+    
     autoPunchConn = task.spawn(function()
         while State.AutoPunch do
-            local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
-            if ev then
-                pcall(function()
-                    ev:FireServer("punch", "leftHand")
-                    ev:FireServer("punch", "rightHand")
-                end)
+            local char = player.Character
+            -- Verificamos que el personaje esté vivo
+            if char and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
+                local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
+                if ev then
+                    pcall(function()
+                        -- Enviamos la acción directamente al servidor (como si tocaras la pantalla)
+                        ev:FireServer("punch", "leftHand")
+                        ev:FireServer("punch", "rightHand")
+                    end)
+                end
             end
-            task.wait()
+            -- Delay de 0.1s para que el servidor de Roblox procese los golpes correctamente
+            task.wait(0.1)
         end
     end)
 end
@@ -254,7 +262,9 @@ local function startAutoFarmBoss()
     if State.AutoFarmBoss then return end
     State.AutoFarmBoss = true
     
-    -- Auto equip Auto Punch
+    -- Forzar el reinicio del Auto Punch
+    State.AutoPunch = false
+    stopAutoPunch()
     startAutoPunch()
     
     local heartbeatConn = nil
@@ -302,7 +312,6 @@ local function startAutoFarmBoss()
                     local centerPos = model:GetPivot().Position
                     local highestY = -math.huge
                     
-                    -- Calculamos el borde superior EXACTO de cada parte visible
                     for _, v in ipairs(model:GetDescendants()) do
                         if v:IsA("BasePart") and v.Transparency < 0.9 then
                             local topEdge = v.Position.Y + (v.Size.Y / 2)
@@ -312,15 +321,11 @@ local function startAutoFarmBoss()
                         end
                     end
                     
-                    -- Si por alguna razón no encontró partes, usamos el centro
                     if highestY == -math.huge then
                         highestY = centerPos.Y
                     end
 
-                    -- Posicionarse 2.5 studs arriba del borde superior exacto
                     local newPos = Vector3.new(centerPos.X, highestY + 2.5, centerPos.Z)
-                    
-                    -- Mirar hacia abajo (al centro del jefe)
                     hrp.CFrame = CFrame.lookAt(newPos, centerPos)
                 end)
             end
@@ -1036,7 +1041,7 @@ local function buildMainUI()
         toggleAntiAfk(v)
     end)
     
-    createToggle(utilPage, "FPS Boost (Compresión Máxima)", function(v)
+    createToggle(utilPage, "FPS Boost", function(v)
         toggleFPSBoost(v)
     end)
 
