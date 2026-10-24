@@ -2,8 +2,7 @@
     ERDN PREMIUM SCRIPT | Muscle Legends — Halloween Spooky UI 🎃🦇
     ------------------------------------------------------------
     🔑 KEY: ERDNONTOP
-    Features: Fast Rep, Auto Rebirth (6s), Auto Kill Boss, 
-    Teleports, Anti-AFK, FPS Boost, and Halloween Theme UI.
+    Auto Farm Boss: Exact Top Edge calculation (2.5 studs above, looking down).
 ]]
 
 --==================== SERVICES ====================
@@ -22,7 +21,9 @@ local KEY = "ERDNONTOP"
 local State = {
     FastRep = false,
     AutoRebirth = false,
-    AutoBossKill = false,
+    AutoFarmBoss = false,
+    AutoPunch = false,
+    AutoSkipTimer = false,
     AutoSpin = false,
     KillAura = false,
     WalkSpeed = 16,
@@ -33,16 +34,16 @@ local State = {
 
 --==================== HALLOWEEN PALETTE ====================
 local Colors = {
-    bg = Color3.fromRGB(15, 8, 20),        -- Dark Night
-    sidebar = Color3.fromRGB(25, 12, 30),   -- Deep Purple
-    panel = Color3.fromRGB(35, 18, 40),     -- Dark Panel
-    accent = Color3.fromRGB(255, 100, 0),   -- Pumpkin Orange
-    accentDark = Color3.fromRGB(200, 50, 0),-- Dark Orange
-    purple = Color3.fromRGB(150, 50, 200),  -- Neon Purple
-    text = Color3.fromRGB(230, 230, 240),   -- Ghost White
+    bg = Color3.fromRGB(15, 8, 20),
+    sidebar = Color3.fromRGB(25, 12, 30),
+    panel = Color3.fromRGB(35, 18, 40),
+    accent = Color3.fromRGB(255, 100, 0),
+    accentDark = Color3.fromRGB(200, 50, 0),
+    purple = Color3.fromRGB(150, 50, 200),
+    text = Color3.fromRGB(230, 230, 240),
     textDim = Color3.fromRGB(150, 130, 160),
-    border = Color3.fromRGB(150, 50, 200),  -- Purple Border
-    danger = Color3.fromRGB(200, 0, 0),     -- Blood Red
+    border = Color3.fromRGB(150, 50, 200),
+    danger = Color3.fromRGB(200, 0, 0),
     white = Color3.fromRGB(255, 255, 255),
 }
 
@@ -51,7 +52,6 @@ local function getChar() return player.Character end
 local function getHRP() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
 local function getHum() local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
 
--- Sparkle Effect on Click (Orange/Purple)
 local function createSparkle(parent, x, y)
     for i = 1, 6 do
         local s = Instance.new("Frame")
@@ -73,7 +73,6 @@ local function createSparkle(parent, x, y)
     end
 end
 
--- Halloween Particles (Pumpkins and Bats)
 local function spawnSpookyParticles(parent, amount, speedRange)
     task.spawn(function()
         while parent and parent.Parent do
@@ -103,7 +102,7 @@ local function spawnSpookyParticles(parent, amount, speedRange)
     end)
 end
 
---==================== FAST REP (LOGIC INTACT) ====================
+--==================== FAST REP ====================
 local fastRepThread = nil
 local function stopFastRep()
     State.FastRep = false
@@ -123,10 +122,12 @@ local function startFastRep(burstSize)
                 cachedEvent = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
             end
             if cachedEvent then
-                for i = 1, burstSize do
-                    if not State.FastRep then break end
-                    cachedEvent:FireServer("rep")
-                end
+                pcall(function()
+                    for i = 1, burstSize do
+                        if not State.FastRep then break end
+                        cachedEvent:FireServer("rep")
+                    end
+                end)
                 task.wait()
             else
                 task.wait(0.1)
@@ -135,7 +136,7 @@ local function startFastRep(burstSize)
     end)
 end
 
---==================== AUTO REBIRTH (INTACT - 6s) ====================
+--==================== AUTO REBIRTH ====================
 local function startAutoRebirth()
     if State.AutoRebirth then return end
     State.AutoRebirth = true
@@ -153,7 +154,34 @@ local function startAutoRebirth()
     end)
 end
 
---==================== AUTO KILL BOSS (RECURSIVE) ====================
+--==================== AUTO PUNCH ====================
+local autoPunchConn = nil
+local function startAutoPunch()
+    if State.AutoPunch then return end
+    State.AutoPunch = true
+    autoPunchConn = task.spawn(function()
+        while State.AutoPunch do
+            local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
+            if ev then
+                pcall(function()
+                    ev:FireServer("punch", "leftHand")
+                    ev:FireServer("punch", "rightHand")
+                end)
+            end
+            task.wait()
+        end
+    end)
+end
+
+local function stopAutoPunch()
+    State.AutoPunch = false
+    if autoPunchConn then
+        task.cancel(autoPunchConn)
+        autoPunchConn = nil
+    end
+end
+
+--==================== AUTO FARM BOSS (TOP EDGE MATH) ====================
 local currentBossName = "None"
 local currentBossHealth = "N/A"
 local detectedBossCount = 0
@@ -161,78 +189,141 @@ local detectedBossCount = 0
 local function getBossTargets()
     local bosses = {}
     local myChar = getChar()
-    local bossFolders = {"BossArena", "Bosses", "Boss"}
-    for _, folderName in ipairs(bossFolders) do
-        local folder = Workspace:FindFirstChild(folderName)
-        if folder then
-            for _, obj in ipairs(folder:GetDescendants()) do
-                if obj:IsA("Humanoid") and obj.Health > 0 then
-                    local model = obj.Parent
-                    if model and model ~= myChar and not Players:GetPlayerFromCharacter(model) then
-                        table.insert(bosses, {model = model, hum = obj})
-                    end
-                end
+    
+    local targetNames = {
+        ["Boss1"] = true, ["Boss2"] = true, ["Boss3"] = true,
+        ["Boss4"] = true, ["Boss5"] = true, ["Boss6"] = true
+    }
+
+    local events = Workspace:FindFirstChild("Events")
+    local bossArena = events and events:FindFirstChild("BossArena")
+    
+    if not bossArena then
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v.Name == "BossArena" and v:IsA("Folder") then
+                bossArena = v
+                break
             end
-            if #bosses > 0 then return bosses end
         end
     end
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") then
-            local model = obj.Parent
-            if model and model:IsA("Model") and model ~= myChar and not Players:GetPlayerFromCharacter(model) then
-                if obj.Health > 0 then
-                    local name = string.lower(model.Name)
-                    local isFriendly = string.find(name, "dummy") or string.find(name, "training") or string.find(name, "npc")
-                    local isBoss = (obj.MaxHealth >= 50000) or string.find(name, "boss")
-                    if not isFriendly and isBoss then
-                        table.insert(bosses, {model = model, hum = obj})
+
+    if bossArena then
+        for _, obj in ipairs(bossArena:GetChildren()) do
+            if obj:IsA("Model") and obj ~= myChar and targetNames[obj.Name] then
+                local hpVal = nil
+                for _, v in ipairs(obj:GetDescendants()) do
+                    if (v:IsA("NumberValue") or v:IsA("IntValue")) and (string.find(string.lower(v.Name), "health") or string.find(string.lower(v.Name), "hp") or v.Name == "Value") then
+                        hpVal = v
+                        break
                     end
                 end
+                table.insert(bosses, {model = obj, healthValue = hpVal})
             end
         end
     end
     return bosses
 end
 
-local function startAutoBossKill()
-    if State.AutoBossKill then return end
-    State.AutoBossKill = true
-    task.spawn(function()
-        while State.AutoBossKill do
-            local bosses = getBossTargets()
-            detectedBossCount = #bosses
-            if #bosses == 0 then
-                currentBossName = "Searching..."
-                currentBossHealth = "N/A"
-                task.wait(1)
-            else
-                local b = bosses[1]
-                local hum = b.hum
-                local model = b.model
-                if hum and hum.Health > 0 then
-                    currentBossName = model.Name
-                    currentBossHealth = math.floor(hum.Health) .. " / " .. math.floor(hum.MaxHealth)
-                    local targetPart = model.PrimaryPart or model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
-                    local hrp = getHRP()
-                    local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
-                    if targetPart and hrp and ev then
-                        pcall(function()
-                            hrp.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, 2, 0))
-                            hrp.Velocity = Vector3.zero
-                        end)
-                        for _ = 1, 15 do
-                            if not State.AutoBossKill then break end
-                            pcall(function()
-                                ev:FireServer("punch", "leftHand")
-                                ev:FireServer("punch", "rightHand")
-                            end)
-                            task.wait(0.01)
+local function findAndClickSkipTimer()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if playerGui then
+        for _, obj in ipairs(playerGui:GetDescendants()) do
+            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                local txt = string.lower(obj.Text or obj.Name)
+                if string.find(txt, "skip") or string.find(txt, "random boss") then
+                    pcall(function() obj:Activate() end)
+                    return true
+                end
+            end
+        end
+    end
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local txt = string.lower(obj.ActionText)
+            if string.find(txt, "skip") or string.find(txt, "random boss") then
+                pcall(function() fireproximityprompt(obj) end)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function startAutoFarmBoss()
+    if State.AutoFarmBoss then return end
+    State.AutoFarmBoss = true
+    
+    -- Auto equip Auto Punch
+    startAutoPunch()
+    
+    local heartbeatConn = nil
+    
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        if not State.AutoFarmBoss then
+            if heartbeatConn then heartbeatConn:Disconnect() end
+            local hrp = getHRP()
+            if hrp then pcall(function() hrp.Anchored = false end) end
+            return
+        end
+
+        local bosses = getBossTargets()
+        detectedBossCount = #bosses
+        
+        if #bosses == 0 then
+            currentBossName = "Waiting..."
+            currentBossHealth = "N/A"
+            
+            if State.AutoSkipTimer then
+                findAndClickSkipTimer()
+            end
+            return
+        end
+
+        local target = bosses[1]
+        local model = target.model
+        
+        local isAlive = true
+        if target.healthValue then
+            isAlive = target.healthValue.Value > 0
+            currentBossHealth = tostring(target.healthValue.Value)
+        end
+
+        if isAlive then
+            currentBossName = model.Name
+            
+            local hrp = getHRP()
+            
+            if hrp and model then
+                pcall(function()
+                    hrp.Anchored = false
+                    hrp.Velocity = Vector3.zero
+                    
+                    local centerPos = model:GetPivot().Position
+                    local highestY = -math.huge
+                    
+                    -- Calculamos el borde superior EXACTO de cada parte visible
+                    for _, v in ipairs(model:GetDescendants()) do
+                        if v:IsA("BasePart") and v.Transparency < 0.9 then
+                            local topEdge = v.Position.Y + (v.Size.Y / 2)
+                            if topEdge > highestY then
+                                highestY = topEdge
+                            end
                         end
                     end
-                end
-                task.wait(0.1)
+                    
+                    -- Si por alguna razón no encontró partes, usamos el centro
+                    if highestY == -math.huge then
+                        highestY = centerPos.Y
+                    end
+
+                    -- Posicionarse 2.5 studs arriba del borde superior exacto
+                    local newPos = Vector3.new(centerPos.X, highestY + 2.5, centerPos.Z)
+                    
+                    -- Mirar hacia abajo (al centro del jefe)
+                    hrp.CFrame = CFrame.lookAt(newPos, centerPos)
+                end)
             end
-            task.wait(0.1)
         end
     end)
 end
@@ -249,8 +340,15 @@ local function startAutoSpin()
                     for _, obj in ipairs(gui:GetDescendants()) do
                         if obj:IsA("TextButton") or obj:IsA("ImageButton") then
                             local txt = string.lower(obj.Text or obj.Name)
-                            if string.find(txt, "spin") or string.find(txt, "wheel") then
+                            if (string.find(txt, "spin") or string.find(txt, "wheel")) and obj.Visible then
                                 obj:Activate()
+                                if obj.MouseButton1Click then obj.MouseButton1Click:Fire() end
+                                if obj.MouseButton1Down then obj.MouseButton1Down:Fire() end
+                                
+                                local pos = obj.AbsolutePosition + (obj.AbsoluteSize / 2)
+                                VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+                                task.wait(0.05)
+                                VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
                                 break
                             end
                         end
@@ -270,18 +368,48 @@ local function startKillAura()
             local hrp = getHRP()
             local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
             if hrp and ev then
+                local closestTarget = nil
+                local shortestDistance = 35
+                
                 for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        if (hrp.Position - p.Character.HumanoidRootPart.Position).Magnitude < 30 then
-                            pcall(function()
-                                ev:FireServer("punch", "leftHand")
-                                ev:FireServer("punch", "rightHand")
-                            end)
+                    if p ~= player and p.Character then
+                        local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                        local tHum = p.Character:FindFirstChildOfClass("Humanoid")
+                        if tHrp and tHum and tHum.Health > 0 then
+                            local dist = (hrp.Position - tHrp.Position).Magnitude
+                            if dist < shortestDistance then
+                                shortestDistance = dist
+                                closestTarget = tHrp
+                            end
                         end
                     end
                 end
+                
+                local bossArena = Workspace:FindFirstChild("BossArena") or (Workspace:FindFirstChild("Events") and Workspace.Events:FindFirstChild("BossArena"))
+                if bossArena then
+                    for _, v in ipairs(bossArena:GetChildren()) do
+                        if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") then
+                            local tHum = v:FindFirstChildOfClass("Humanoid")
+                            if tHum and tHum.Health > 0 then
+                                local dist = (hrp.Position - v.HumanoidRootPart.Position).Magnitude
+                                if dist < shortestDistance then
+                                    shortestDistance = dist
+                                    closestTarget = v.HumanoidRootPart
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if closestTarget then
+                    pcall(function()
+                        hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(closestTarget.Position.X, hrp.Position.Y, closestTarget.Position.Z))
+                        ev:FireServer("punch", "leftHand")
+                        ev:FireServer("punch", "rightHand")
+                    end)
+                end
             end
-            task.wait(0.1)
+            task.wait(0.05)
         end
     end)
 end
@@ -348,19 +476,33 @@ end
 local function toggleFPSBoost(state)
     pcall(function()
         if state then
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
             for _, v in ipairs(game.Lighting:GetChildren()) do
-                if v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") then
+                if v:IsA("PostEffect") or v:IsA("Atmosphere") then
                     v.Enabled = false
                 end
             end
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("MeshPart") then
+                    v.RenderFidelity = Enum.RenderFidelity.Performance
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
+                elseif v:IsA("SurfaceAppearance") then
+                    v.Enabled = false
+                end
+            end
         else
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
             for _, v in ipairs(game.Lighting:GetChildren()) do
-                if v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") then
+                if v:IsA("PostEffect") or v:IsA("Atmosphere") then
                     v.Enabled = true
                 end
             end
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("MeshPart") then
+                    v.RenderFidelity = Enum.RenderFidelity.Automatic
+                end
+            end
         end
     end)
 end
@@ -373,7 +515,6 @@ screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- 1. KEY SYSTEM UI
 local keyFrame = Instance.new("Frame")
 keyFrame.Size = UDim2.new(1, 0, 1, 0)
 keyFrame.BackgroundColor3 = Colors.bg
@@ -435,7 +576,6 @@ verifyBtn.ZIndex = 102
 verifyBtn.Parent = keyCard
 Instance.new("UICorner", verifyBtn).CornerRadius = UDim.new(0, 10)
 
--- 2. SPLASH SCREEN ANIMATION
 local function playSplashAnimation(onComplete)
     keyFrame:Destroy()
     
@@ -515,7 +655,6 @@ local function playSplashAnimation(onComplete)
     end)
 end
 
--- 3. MAIN UI INTERFACE
 local function buildMainUI()
     local main = Instance.new("Frame")
     main.Size = UDim2.new(0, 580, 0, 430)
@@ -545,7 +684,6 @@ local function buildMainUI()
     main.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(main, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 580, 0, 430)}):Play()
 
-    -- Header
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, 55)
     header.BackgroundColor3 = Colors.sidebar
@@ -565,7 +703,6 @@ local function buildMainUI()
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
 
-    -- Minimize Button
     local minimizeBtn = Instance.new("TextButton")
     minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
     minimizeBtn.Position = UDim2.new(1, -40, 0, 12)
@@ -577,7 +714,6 @@ local function buildMainUI()
     minimizeBtn.Parent = header
     Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(1, 0)
 
-    -- Sidebar
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 150, 1, -75)
     sidebar.Position = UDim2.new(0, 12, 0, 65)
@@ -592,7 +728,6 @@ local function buildMainUI()
     tabList.Parent = sidebar
     Instance.new("UIPadding", sidebar).PaddingTop = UDim.new(0, 10)
 
-    -- Content
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -180, 1, -75)
     content.Position = UDim2.new(0, 170, 0, 65)
@@ -659,7 +794,6 @@ local function buildMainUI()
         end)
     end
 
-    -- UI Helper Functions
     local function createToggle(parent, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -10, 0, 52)
@@ -753,7 +887,6 @@ local function buildMainUI()
         end)
     end
 
-    -- Farm Tab
     local farmPage = pages["Farm"]
     local rep10k, rep2k, rep500, repExact500
 
@@ -796,6 +929,9 @@ local function buildMainUI()
     createToggle(farmPage, "Auto Rebirth (6s)", function(v)
         if v then startAutoRebirth() else State.AutoRebirth = false end
     end)
+    createToggle(farmPage, "Auto Punch (Network)", function(v)
+        if v then startAutoPunch() else stopAutoPunch() end
+    end)
     createToggle(farmPage, "Auto Spin Wheel", function(v)
         if v then startAutoSpin() else State.AutoSpin = false end
     end)
@@ -803,7 +939,6 @@ local function buildMainUI()
         if v then startKillAura() else State.KillAura = false end
     end)
 
-    -- Boss Tab
     local bossPage = pages["Boss"]
     local statusFrame = Instance.new("Frame")
     statusFrame.Size = UDim2.new(1, -10, 0, 64)
@@ -835,36 +970,55 @@ local function buildMainUI()
     statusBoss.TextXAlignment = Enum.TextXAlignment.Left
     statusBoss.Parent = statusFrame
 
-    createToggle(bossPage, "Auto Kill Boss", function(v)
+    createToggle(bossPage, "Auto Farm Boss", function(v)
         if v then 
-            startAutoBossKill() 
-            statusTitle.Text = "Status: Searching..."
+            startAutoFarmBoss() 
+            statusTitle.Text = "Status: Farming..."
             statusTitle.TextColor3 = Colors.accent
         else 
-            State.AutoBossKill = false 
+            State.AutoFarmBoss = false 
+            stopAutoPunch()
+            
+            local hrp = getHRP()
+            if hrp then
+                pcall(function() hrp.Anchored = false end)
+            end
+            
             statusTitle.Text = "Status: Inactive"
             statusTitle.TextColor3 = Colors.text
             statusBoss.Text = "Boss: N/A"
         end
     end)
-    
-    createButton(bossPage, "Scan Boss", function()
-        local bosses = getBossTargets()
-        if #bosses == 0 then print("No bosses found.") 
+
+    createButton(bossPage, "Scan Boss (Deep Log)", function()
+        print("=========================================")
+        print("--- INICIANDO ESCANEO EN BOSSARENA ---")
+        print("=========================================")
+        local found = 0
+        local bossArena = Workspace:FindFirstChild("BossArena") or (Workspace:FindFirstChild("Events") and Workspace.Events:FindFirstChild("BossArena"))
+        
+        if bossArena then
+            for _, obj in ipairs(bossArena:GetDescendants()) do
+                if obj:IsA("Model") then
+                    found = found + 1
+                    print("Modelo:", obj.Name)
+                    print("Ruta:", obj:GetFullName())
+                    local hpVal = obj:FindFirstChild("Value") or obj:FindFirstChild("Health") or obj:FindFirstChild("HP")
+                    if hpVal then print("  - Valor de Vida:", hpVal.Value) end
+                    print("-----------------------------------------")
+                end
+            end
+            print("--- FIN. Total jefes: " .. found .. " ---")
         else
-            local names = {}
-            for _, b in ipairs(bosses) do table.insert(names, b.model.Name) end
-            print("Bosses found: " .. table.concat(names, ", "))
+            print("No se encontró la carpeta BossArena.")
         end
     end)
 
-    -- Teleport Tab
     local tpPage = pages["Teleport"]
     for gymName, _ in pairs(gymCoords) do
         createButton(tpPage, "🕸️ " .. gymName, function() teleportToGym(gymName) end)
     end
 
-    -- Utils Tab
     local utilPage = pages["Utils"]
     createToggle(utilPage, "Fullbright", function(v)
         if v then
@@ -882,7 +1036,7 @@ local function buildMainUI()
         toggleAntiAfk(v)
     end)
     
-    createToggle(utilPage, "FPS Boost", function(v)
+    createToggle(utilPage, "FPS Boost (Compresión Máxima)", function(v)
         toggleFPSBoost(v)
     end)
 
@@ -890,7 +1044,7 @@ local function buildMainUI()
     
     task.spawn(function()
         while screenGui.Parent do
-            if State.AutoBossKill then
+            if State.AutoFarmBoss then
                 statusBoss.Text = string.format("Bosses: %d | Target: %s (%s)", detectedBossCount, currentBossName, currentBossHealth)
             else
                 statusBoss.Text = "Boss: N/A"
@@ -899,7 +1053,6 @@ local function buildMainUI()
         end
     end)
 
-    -- MINIMIZE / RESTORE LOGIC
     local minimized = false
     local floatBtn = nil
 
@@ -958,7 +1111,6 @@ local function buildMainUI()
     minimizeBtn.MouseButton1Click:Connect(minimize)
 end
 
---==================== KEY SYSTEM LOGIC ====================
 verifyBtn.MouseButton1Click:Connect(function()
     if keyInput.Text == KEY then
         playSplashAnimation(buildMainUI)
