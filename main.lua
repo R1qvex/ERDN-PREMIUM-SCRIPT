@@ -4,7 +4,7 @@
     🔑 KEY: ERDNONTOP
     Auto Farm Boss: Exact Top Edge calculation.
     Auto Punch: Direct network punch.
-    Fast Rep: Anti-Ban / Anti-Kick Protection (High Speed).
+    Fast Rep: Custom High Speed Rates (500, 2k, 5k, 10k) + Anti-Kick.
 ]]
 
 --==================== SERVICES ====================
@@ -21,20 +21,17 @@ local KEY = "ERDNONTOP"
 
 --==================== ANTI-BAN / ANTI-KICK PROTECTION ====================
 pcall(function()
-    -- 1. Bloquear la función Kick del jugador local
     local oldKick = player.Kick
     player.Kick = function(self, reason)
         print("[ANTI-BAN] Intento de kick bloqueado: ", reason)
         return
     end
 
-    -- 2. Bloquear la desconexión de red (Hyperion)
     local oldDisconnect = game.Kick
     if game.Kick then
         game.Kick = function() end
     end
     
-    -- 3. Proteger metatablas para evitar detección del ejecutor
     if getrawmetatable then
         local mt = getrawmetatable(game)
         if mt and mt.__namecall then
@@ -43,7 +40,7 @@ pcall(function()
             mt.__namecall = newcclosure(function(self, ...)
                 local method = getnamecallmethod()
                 if method == "Kick" and self == player then
-                    return -- Bloquea el kick silenciosamente
+                    return
                 end
                 return oldNamecall(self, ...)
             end)
@@ -138,7 +135,7 @@ local function spawnSpookyParticles(parent, amount, speedRange)
     end)
 end
 
---==================== FAST REP (HIGH SPEED + ANTI-KICK) ====================
+--==================== FAST REP (CUSTOM SPEED + ANTI-KICK) ====================
 local fastRepThread = nil
 local function stopFastRep()
     State.FastRep = false
@@ -148,27 +145,27 @@ local function stopFastRep()
     end
 end
 
-local function startFastRep(burstSize)
+local function startFastRep(repsPerSecond)
     stopFastRep()
     State.FastRep = true
     fastRepThread = task.spawn(function()
         local cachedEvent = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
+        
+        -- Calculamos cuántos golpes enviar cada 10ms (100 veces por segundo) para alcanzar la meta
+        local repsPerTick = math.max(1, math.floor(repsPerSecond / 100))
+        
         while State.FastRep do
             if not cachedEvent or not cachedEvent.Parent then
                 cachedEvent = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
             end
             if cachedEvent then
                 pcall(function()
-                    local totalSent = 0
-                    while totalSent < burstSize and State.FastRep do
-                        for i = 1, math.min(10, burstSize - totalSent) do
-                            cachedEvent:FireServer("rep")
-                        end
-                        totalSent = totalSent + 10
-                        task.wait(0.015)
+                    for i = 1, repsPerTick do
+                        if not State.FastRep then break end
+                        cachedEvent:FireServer("rep")
                     end
                 end)
-                task.wait(0.05)
+                task.wait(0.01) -- 10 milisegundos (Invisible para el ojo, seguro para la red)
             else
                 task.wait(0.1)
             end
@@ -930,12 +927,13 @@ local function buildMainUI()
     local farmPage = pages["Farm"]
     local rep10k, rep2k, rep500, repExact500
 
+    -- Nuevos valores ajustados según la solicitud
     rep10k = createToggle(farmPage, "Ultra fast rep", function(v)
         if v then
             if rep2k then rep2k.set(false, false) end
             if rep500 then rep500.set(false, false) end
             if repExact500 then repExact500.set(false, false) end
-            startFastRep(500) 
+            startFastRep(10000) -- 10,000 por segundo
         else stopFastRep() end
     end)
 
@@ -944,7 +942,7 @@ local function buildMainUI()
             if rep10k then rep10k.set(false, false) end
             if rep500 then rep500.set(false, false) end
             if repExact500 then repExact500.set(false, false) end
-            startFastRep(150)
+            startFastRep(5000) -- 5,000 por segundo
         else stopFastRep() end
     end)
 
@@ -953,7 +951,7 @@ local function buildMainUI()
             if rep10k then rep10k.set(false, false) end
             if rep2k then rep2k.set(false, false) end
             if repExact500 then repExact500.set(false, false) end
-            startFastRep(30)
+            startFastRep(2000) -- 2,000 por segundo
         else stopFastRep() end
     end)
 
@@ -962,7 +960,7 @@ local function buildMainUI()
             if rep10k then rep10k.set(false, false) end
             if rep2k then rep2k.set(false, false) end
             if rep500 then rep500.set(false, false) end
-            startFastRep(8)
+            startFastRep(500) -- 500 por segundo
         else stopFastRep() end
     end)
 
