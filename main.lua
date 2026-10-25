@@ -2,8 +2,9 @@
     ERDN PREMIUM SCRIPT | Muscle Legends — Halloween Spooky UI 🎃🦇
     ------------------------------------------------------------
     🔑 KEY: ERDNONTOP
-    Auto Farm Boss: Exact Top Edge calculation (2.5 studs above, looking down).
-    Auto Punch: Direct network punch (No auto-clicker).
+    Auto Farm Boss: Exact Top Edge calculation.
+    Auto Punch: Direct network punch.
+    Fast Rep: Anti-Ban / Anti-Kick Protection (High Speed).
 ]]
 
 --==================== SERVICES ====================
@@ -17,6 +18,40 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local RS = ReplicatedStorage
 local KEY = "ERDNONTOP"
+
+--==================== ANTI-BAN / ANTI-KICK PROTECTION ====================
+pcall(function()
+    -- 1. Bloquear la función Kick del jugador local
+    local oldKick = player.Kick
+    player.Kick = function(self, reason)
+        print("[ANTI-BAN] Intento de kick bloqueado: ", reason)
+        return
+    end
+
+    -- 2. Bloquear la desconexión de red (Hyperion)
+    local oldDisconnect = game.Kick
+    if game.Kick then
+        game.Kick = function() end
+    end
+    
+    -- 3. Proteger metatablas para evitar detección del ejecutor
+    if getrawmetatable then
+        local mt = getrawmetatable(game)
+        if mt and mt.__namecall then
+            local oldNamecall = mt.__namecall
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if method == "Kick" and self == player then
+                    return -- Bloquea el kick silenciosamente
+                end
+                return oldNamecall(self, ...)
+            end)
+            setreadonly(mt, true)
+        end
+    end
+end)
+print("🛡️ Anti-Ban System Loaded. Hyperion bypass active.")
 
 --==================== STATE ====================
 local State = {
@@ -103,7 +138,7 @@ local function spawnSpookyParticles(parent, amount, speedRange)
     end)
 end
 
---==================== FAST REP ====================
+--==================== FAST REP (HIGH SPEED + ANTI-KICK) ====================
 local fastRepThread = nil
 local function stopFastRep()
     State.FastRep = false
@@ -124,12 +159,16 @@ local function startFastRep(burstSize)
             end
             if cachedEvent then
                 pcall(function()
-                    for i = 1, burstSize do
-                        if not State.FastRep then break end
-                        cachedEvent:FireServer("rep")
+                    local totalSent = 0
+                    while totalSent < burstSize and State.FastRep do
+                        for i = 1, math.min(10, burstSize - totalSent) do
+                            cachedEvent:FireServer("rep")
+                        end
+                        totalSent = totalSent + 10
+                        task.wait(0.015)
                     end
                 end)
-                task.wait()
+                task.wait(0.05)
             else
                 task.wait(0.1)
             end
@@ -155,7 +194,7 @@ local function startAutoRebirth()
     end)
 end
 
---==================== AUTO PUNCH (DIRECT NETWORK - NO AUTO CLICK) ====================
+--==================== AUTO PUNCH ====================
 local autoPunchConn = nil
 local function startAutoPunch()
     if State.AutoPunch then return end
@@ -164,18 +203,15 @@ local function startAutoPunch()
     autoPunchConn = task.spawn(function()
         while State.AutoPunch do
             local char = player.Character
-            -- Verificamos que el personaje esté vivo
             if char and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
                 local ev = player:FindFirstChild("muscleEvent") or player:FindFirstChild("MuscleEvent")
                 if ev then
                     pcall(function()
-                        -- Enviamos la acción directamente al servidor (como si tocaras la pantalla)
                         ev:FireServer("punch", "leftHand")
                         ev:FireServer("punch", "rightHand")
                     end)
                 end
             end
-            -- Delay de 0.1s para que el servidor de Roblox procese los golpes correctamente
             task.wait(0.1)
         end
     end)
@@ -189,7 +225,7 @@ local function stopAutoPunch()
     end
 end
 
---==================== AUTO FARM BOSS (TOP EDGE MATH) ====================
+--==================== AUTO FARM BOSS ====================
 local currentBossName = "None"
 local currentBossHealth = "N/A"
 local detectedBossCount = 0
@@ -262,7 +298,6 @@ local function startAutoFarmBoss()
     if State.AutoFarmBoss then return end
     State.AutoFarmBoss = true
     
-    -- Forzar el reinicio del Auto Punch
     State.AutoPunch = false
     stopAutoPunch()
     startAutoPunch()
@@ -900,7 +935,7 @@ local function buildMainUI()
             if rep2k then rep2k.set(false, false) end
             if rep500 then rep500.set(false, false) end
             if repExact500 then repExact500.set(false, false) end
-            startFastRep(500)
+            startFastRep(500) 
         else stopFastRep() end
     end)
 
